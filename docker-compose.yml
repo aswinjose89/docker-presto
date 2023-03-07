@@ -1,0 +1,58 @@
+---
+# brings up the dependencies
+version: '2'
+services:
+  # presto:
+  #   build: .
+  #   links:
+  #     - mongodb
+  #     - postgresql
+  #     - mysql
+  #   depends_on:
+  #     - mongodb
+  #     - postgresql
+  #     - mysql
+  #   ports:
+  #     - "8080:8080"
+
+  presto:
+    image: ahanaio/prestodb-sandbox
+    container_name: presto
+    volumes:
+      - ${PWD}/config/catalog/:/opt/presto-server/etc/catalog
+    links:
+      - mongodb
+      - postgresql
+      - mysql
+    depends_on:
+      - mongodb
+      - postgresql
+      - mysql
+    ports:
+      - "8080:8080"
+
+  mysql:
+    image: mysql
+    container_name: presto-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 'presto'
+      MYSQL_USER: 'presto'
+      MYSQL_PASSWORD: 'presto'
+    ports:
+      - "3306:3306"
+
+  mongodb:
+    image: mongo
+    container_name: presto-mongo
+    ports:
+      - "27017:27017"
+
+  postgresql:
+    image: postgres
+    container_name: presto-postgres
+    environment:
+      POSTGRES_USER: 'root'
+      POSTGRES_PASSWORD: 'presto'
+      POSTGRES_DB: 'postgres'
+    ports:
+      - "5432:5432"
