@@ -20,14 +20,21 @@ services:
     container_name: presto
     volumes:
       - ${PWD}/config/catalog/:/opt/presto-server/etc/catalog
+      # - ${PWD}/config/config.properties:/opt/presto-server/etc/config.properties
+      # - ${PWD}/config/jvm.config:/opt/presto-server/etc/jvm.config
     links:
       - mongodb
       - postgresql
       - mysql
+      - elasticsearch
+      - kafka
+      - zookeeper
     depends_on:
       - mongodb
       - postgresql
       - mysql
+      - elasticsearch
+      - kafka
     ports:
       - "8080:8080"
 
@@ -56,3 +63,63 @@ services:
       POSTGRES_DB: 'postgres'
     ports:
       - "5432:5432"
+  
+  elasticsearch:
+    container_name: presto-elasticsearch
+    image: elasticsearch:7.9.1
+    environment:
+      - cluster.name=nids-cluster
+      - bootstrap.memory_lock=true
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_USERNAME=elastic
+    ports:
+      - 9200:9200
+      - 9300:9300
+    volumes:
+      - es_data:/usr/share/elasticsearch/data:rw
+  
+  zookeeper:
+    container_name: nids-zookeeper-cntr
+    image: confluentinc/cp-zookeeper:7.2.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    container_name: presto-kafka
+    image: confluentinc/cp-kafka:7.2.0
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: nids-zookeeper-cntr:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://presto-kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+  
+  init-kafka:
+    image: confluentinc/cp-kafka:7.2.0
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server presto-kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server presto-kafka:9092 --create --if-not-exists --topic nids_prediction --replication-factor 1 --partitions 1
+      
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server presto-kafka:9092 --list
+      "
+
+volumes:
+  es_data:
+    driver: local
