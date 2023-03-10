@@ -27,8 +27,10 @@ services:
       - postgresql
       - mysql
       - elasticsearch
+      - kibana
       - kafka
       - zookeeper
+      
     depends_on:
       - mongodb
       - postgresql
@@ -73,12 +75,32 @@ services:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - ELASTIC_USERNAME=elastic
+      - ELASTIC_PASSWORD=elastic
     ports:
       - 9200:9200
       - 9300:9300
     volumes:
       - es_data:/usr/share/elasticsearch/data:rw
   
+  kibana:
+    container_name: nids-elk-kb-cntr
+    image: kibana:7.9.1
+    environment:
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=elastic
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+    stdin_open: true
+    tty: true
+    restart: always
+    links: ['elasticsearch']
+    
   zookeeper:
     container_name: nids-zookeeper-cntr
     image: confluentinc/cp-zookeeper:7.2.0
@@ -123,3 +145,4 @@ services:
 volumes:
   es_data:
     driver: local
+  
